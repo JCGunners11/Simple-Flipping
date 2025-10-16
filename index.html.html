@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OSRS Flipping Tool v3</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #f4f4f4, #e9ecef);
+      color: #333;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #b58e27;
+      font-weight: 700;
+      margin-bottom: 25px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+      margin-bottom: 20px;
+      transition: transform 0.2s;
+    }
+    .card:hover { transform: translateY(-2px); }
+    label { font-weight: 600; }
+    button {
+      background: linear-gradient(90deg, #b58e27, #d4af37);
+      border: none;
+      color: #fff;
+      font-weight: 600;
+      border-radius: 6px;
+      padding: 10px 16px;
+      margin: 5px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+    }
+    input[type="number"], input[type="text"] {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 5px;
+      margin-bottom: 10px;
+      width: 100%;
+    }
+    #suggestion-result img {
+      border-radius: 6px;
+      border: 2px solid #d4af37;
+      margin-bottom: 10px;
+    }
+    .volume-badge {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 4px 8px;
+      border-radius: 5px;
+      font-size: 0.85em;
+      font-weight: 600;
+    }
+    .high { background-color: #e0f5e9; color: #267a3d; }
+    .medium { background-color: #fff4ce; color: #856404; }
+    .low { background-color: #fdecea; color: #842029; }
+    .trade-entry {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .trade-entry:last-child { border-bottom: none; }
+    .trade-profit.positive { color: #28a745; font-weight: 600; }
+    .trade-profit.negative { color: #dc3545; font-weight: 600; }
+    #success-message {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #d4af37;
+      color: #000;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      animation: fadeInOut 3s ease-in-out;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translateY(-10px); }
+      10%, 90% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-10px); }
+    }
+    @media (max-width: 600px) {
+      body { padding: 10px; }
+      .card { padding: 15px; }
+      button { width: 100%; margin: 6px 0; }
+    }
+  </style>
+</head>
+<body>
+  <h1>💰 OSRS Flipping Tool v3 💰</h1>
+
+  <div class="card" id="control-panel">
+    <label for="starting-gp">Starting GP:</label>
+    <input id="starting-gp" type="number" placeholder="Enter your starting GP (e.g. 10000000)" />
+    <button id="suggest-btn">Suggest Item</button>
+    <button id="suggest-again-btn" style="display:none;">Suggest Again</button>
+    <div id="loading" style="display:none;">Loading...</div>
+    <div id="error-message" style="display:none;color:#d9534f;font-weight:600;margin-top:8px;"></div>
+  </div>
+
+  <div id="suggestion-result" class="card" style="display:none;">
+    <h2 style="color:#b58e27;">Suggested Item</h2>
+    <img id="item-icon" src="" alt="" width="64" height="64">
+    <div><strong>Name:</strong> <span id="item-name"></span></div>
+    <div><strong>Buy Price:</strong> <span id="buy-price"></span></div>
+    <div><strong>Sell Price:</strong> <span id="sell-price"></span></div>
+    <div><strong>Profit per Item:</strong> <span id="profit-per-item"></span></div>
+    <div><strong>ROI:</strong> <span id="roi"></span></div>
+    <div><strong>Quantity:</strong> <span id="quantity"></span></div>
+    <div><strong>Total Profit:</strong> <span id="total-profit"></span></div>
+    <div><strong>GP Used:</strong> <span id="gp-used"></span></div>
+    <div id="item-volume" class="volume-badge"></div>
+  </div>
+
+  <div class="card">
+    <h2 style="color:#b58e27;">Log Trade</h2>
+    <form id="trade-form">
+      <label>Item: <input id="trade-item-name" type="text" required></label><br><br>
+      <label>Buy Price: <input id="trade-buy-price" type="number" required></label><br><br>
+      <label>Sell Price: <input id="trade-sell-price" type="number" required></label><br><br>
+      <label>Quantity: <input id="trade-quantity" type="number" required></label><br><br>
+      <button type="submit">Log Trade</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2 style="color:#b58e27;">Session Stats</h2>
+    <div>Total Profit: <span id="total-session-profit">0 GP</span></div>
+    <div>Total Trades: <span id="total-trades">0</span></div>
+  </div>
+
+  <div id="trades-list" class="card"></div>
+
+  <script>
+    class OSRSFlippingTool {
+      constructor() {
+        this.apiBase = 'https://prices.runescape.wiki/api/v1/osrs';
+        this.trades = [];
+        this.recentSuggestions = [];
+        this.maxRecentSuggestions = 5;
+        this.initializeApp();
+      }
+
+      async initializeApp() {
+        this.bindEvents();
+        this.loadTradesFromSession();
+        this.updateTradeStats();
+        await this.loadItemMapping();
+      }
+
+      bindEvents() {
+        document.getElementById('suggest-btn').addEventListener('click', () => this.suggestItem());
+        document.getElementById('suggest-again-btn').addEventListener('click', () => this.suggestItem());
+        document.getElementById('trade-form').addEventListener('submit', e => this.logTrade(e));
+      }
+
+      async loadItemMapping() {
+        const res = await fetch(`${this.apiBase}/mapping`);
+        this.itemMapping = await res.json();
+      }
+
+      async loadLatestPrices() {
+        const res = await fetch(`${this.apiBase}/latest`);
+        const data = await res.json();
+        this.latestPrices = data.data;
+      }
+
+      async loadVolumeData() {
+        const res = await fetch(`${this.apiBase}/volumes`);
+        const data = await res.json();
+        this.volumeData = data.data;
+      }
+
+      async loadTrendData() {
+        const res = await fetch(`${this.apiBase}/1h`);
+        const data = await res.json();
+        this.trendData = data.data;
+      }
+
+      async suggestItem() {
+        const btn = document.getElementById('suggest-btn');
+        const again = document.getElementById('suggest-again-btn');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('suggestion-result');
+        const error = document.getElementById('error-message');
+        const gpInput = document.getElementById('starting-gp');
+        const startingGP = parseInt(gpInput.value) || 0;
+
+        if (startingGP <= 0) {
+          error.textContent = "Please enter your starting GP first.";
+          error.style.display = 'block';
+          return;
+        }
+
+        btn.disabled = true;
+        loading.style.display = 'block';
+        result.style.display = 'none';
+        error.style.display = 'none';
+
+        try {
+          await Promise.all([this.loadLatestPrices(), this.loadVolumeData(), this.loadTrendData()]);
+          const suggestion = this.findProfitableItem(startingGP);
+
+          if (!suggestion) throw new Error("No profitable items found matching your GP range.");
+
+          this.displaySuggestion(suggestion, startingGP);
+          result.style.display = 'block';
+          again.style.display = 'inline-block';
+
+          const idx = this.recentSuggestions.indexOf(suggestion.itemId);
+          if (idx > -1) this.recentSuggestions.splice(idx, 1);
+          this.recentSuggestions.push(suggestion.itemId);
+          if (this.recentSuggestions.length > this.maxRecentSuggestions) this.recentSuggestions.shift();
+        } catch (err) {
+          error.textContent = err.message;
+          error.style.display = 'block';
+        } finally {
+          loading.style.display = 'none';
+          btn.disabled = false;
+        }
+      }
+
+      findProfitableItem(startingGP) {
+        const candidates = [];
+
+        for (const [id, price] of Object.entries(this.latestPrices)) {
+          const volume = this.volumeData[id];
+          const info = this.itemMapping.find(i => i.id === parseInt(id));
+          if (!price || !price.high || !price.low || !volume || !info) continue;
+
+          const buy = price.low, sell = price.high;
+          if (buy >= sell || buy <= 0) continue;
+          const profit = this.calculateProfit(buy, sell);
+          const roi = (profit / buy) * 100;
+          if (profit < 2 || roi < 1) continue;
+
+          // Check margin trend
+          const trend = this.trendData[id];
+          const trendBoost = trend && trend.avgHighPrice && trend.avgHighPrice > buy ? 1.2 : 1.0;
+
+          const recQty = this.calculateRecommendedQuantity(buy, volume, startingGP);
+          const totalCost = recQty * buy;
+          if (totalCost > startingGP) continue;
+
+          const score = (profit * trendBoost) + roi + Math.min(volume / 10000, 50);
+          candidates.push({ itemId: parseInt(id), name: info.name, buyPrice: buy, sellPrice: sell, profit, roi, volume, recommendedQty: recQty, score, totalCost });
+        }
+
+        if (!candidates.length) return null;
+
+        const highVol = candidates.filter(c => c.volume >= 100000);
+        const lowVol = candidates.filter(c => c.volume < 100000);
+        const useHighVol = Math.random() < 0.8 && highVol.length;
+        const pool = useHighVol ? highVol : (lowVol.length ? lowVol : candidates);
+
+        const top = pool.sort((a, b) => b.score - a.score).slice(0, 50);
+        return top[Math.floor(Math.random() * top.length)];
+      }
+
+      calculateProfit(buy, sell) {
+        return Math.floor(sell * 0.98) - buy;
+      }
+
+      calculateRecommendedQuantity(price, volume, startingGP) {
+        const maxByGP = Math.floor(startingGP / price);
+        const volumeFactor = volume > 1000000 ? 0.002 : volume > 50000 ? 0.001 : 0.0005;
+        const suggested = Math.floor(Math.min(maxByGP, volume * volumeFactor));
+        return Math.max(1, Math.min(suggested, 2000));
+      }
+
+      displaySuggestion(s, startingGP) {
+        document.getElementById('item-name').textContent = s.name;
+        document.getElementById('buy-price').textContent = `${s.buyPrice.toLocaleString()} GP`;
+        document.getElementById('sell-price').textContent = `${s.sellPrice.toLocaleString()} GP`;
+        document.getElementById('profit-per-item').textContent = `${s.profit.toLocaleString()} GP`;
+        document.getElementById('roi').textContent = `${s.roi.toFixed(1)}%`;
+        document.getElementById('quantity').textContent = s.recommendedQty.toLocaleString();
+        document.getElementById('total-profit').textContent = `${(s.profit * s.recommendedQty).toLocaleString()} GP`;
+        document.getElementById('gp-used').textContent = `${s.totalCost.toLocaleString()} GP of ${startingGP.toLocaleString()} GP`;
+
+        const vol = document.getElementById('item-volume');
+        const volText = s.volume >= 1e6 ? (s.volume / 1e6).toFixed(1) + 'M' : (s.volume / 1e3).toFixed(0) + 'K';
+        vol.textContent = `${volText} volume`;
+        vol.className = 'volume-badge ' + (s.volume >= 100000 ? 'high' : s.volume >= 10000 ? 'medium' : 'low');
+
+        const icon = document.getElementById('item-icon');
+        icon.src = `https://secure.runescape.com/m=itemdb_oldschool/obj_big.gif?id=${s.itemId}`;
+        icon.alt = s.name;
+
+        document.getElementById('trade-item-name').value = s.name;
+        document.getElementById('trade-buy-price').value = s.buyPrice;
+        document.getElementById('trade-sell-price').value = s.sellPrice;
+        document.getElementById('trade-quantity').value = s.recommendedQty;
+      }
+
+      logTrade(e) {
+        e.preventDefault();
+        const item = document.getElementById('trade-item-name').value;
+        const buy = parseInt(document.getElementById('trade-buy-price').value);
+        const sell = parseInt(document.getElementById('trade-sell-price').value);
+        const qty = parseInt(document.getElementById('trade-quantity').value);
+        const profit = this.calculateProfit(buy, sell);
+        const totalProfit = profit * qty;
+
+        this.trades.unshift({ id: Date.now(), itemName: item, buyPrice: buy, sellPrice: sell, quantity: qty, totalProfit, timestamp: new Date().toISOString() });
+        this.updateTradeStats();
+        this.renderTradeHistory();
+
+        const msg = document.createElement('div');
+        msg.id = 'success-message';
+        msg.textContent = 'Trade logged successfully!';
+        document.body.appendChild(msg);
+        setTimeout(() => msg.remove(), 3000);
+        e.target.reset();
+      }
+
+      updateTradeStats() {
+        const total = this.trades.reduce((s, t) => s + t.totalProfit, 0);
+        document.getElementById('total-session-profit').textContent = `${total.toLocaleString()} GP`;
+        document.getElementById('total-trades').textContent = this.trades.length.toString();
+      }
+
+      renderTradeHistory() {
+        const list = document.getElementById('trades-list');
+        if (!this.trades.length) {
+          list.innerHTML = '<p style="color:#777;">No trades logged yet.</p>';
+          return;
+        }
+        list.innerHTML = this.trades.map(t => `
+          <div class="trade-entry">
+            <div>${t.itemName}<br><small>${t.quantity}x @ ${t.buyPrice} → ${t.sellPrice}</small></div>
+            <div class="trade-profit ${t.totalProfit >= 0 ? 'positive' : 'negative'}">${t.totalProfit >= 0 ? '+' : ''}${t.totalProfit.toLocaleString()} GP</div>
+          </div>
+        `).join('');
+      }
+
+      loadTradesFromSession() {
+        this.trades = [];
+        this.renderTradeHistory();
+      }
+    }
+
+    const flippingTool = new OSRSFlippingTool();
+  </script>
+</body>
+</html>
